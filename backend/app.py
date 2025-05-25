@@ -4,6 +4,7 @@ import requests
 from flask_cors import CORS  
 
 app = Flask(__name__)
+CORS(app)
 
 # Replace with your DeepSeek API key (if needed)
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"  # Hypothetical endpoint
