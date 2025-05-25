@@ -6,7 +6,59 @@
     <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
     <title>DeepSeek for Kids</title>
     <style>
-        /* (Keep all your existing styles here) */
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f7fe;
+        }
+        #chatbox {
+            height: 400px;
+            border: 2px solid #d4a5ff;
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: scroll;
+            background-color: white;
+            margin-bottom: 15px;
+        }
+        #userInput {
+            width: 70%;
+            padding: 10px;
+            border: 2px solid #d4a5ff;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #8a2be2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #7b1fa2;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .child-message {
+            background-color: #e1f5fe;
+            align-self: flex-start;
+        }
+        .ai-message {
+            background-color: #ede7f6;
+            align-self: flex-end;
+        }
+        #typing {
+            color: #666;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -21,7 +73,7 @@
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
         
-        // Backend URL
+        // Backend URL (now handles kid-friendly prompting)
         const BACKEND_URL = "https://curly-disco-bzls.onrender.com/deepseek-proxy";
 
         // Add message to chat
@@ -33,7 +85,7 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        // Send message to API
+        // Send message to API (SIMPLIFIED - no prompt engineering here)
         async function handleSendMessage() {
             const childMessage = userInput.value.trim();
             if (!childMessage) return;
@@ -48,15 +100,18 @@
             chatbox.appendChild(typingIndicator);
         
             try {
+                // Just send the raw message - backend adds kid-friendly rules
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        prompt: `[System Note: Respond like you're talking to a 7-year-old child.]\n\nUser: ${childMessage}`
+                        prompt: childMessage  // <-- Only raw input now!
                     })
                 });
                 
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
                 const data = await response.json();
+                
                 chatbox.removeChild(typingIndicator);
                 addMessage('ai', data.response);
             } catch (error) {
@@ -68,7 +123,7 @@
             }
         }
 
-        // Event Listeners (modern approach)
+        // Event Listeners
         sendButton.addEventListener('click', handleSendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleSendMessage();
