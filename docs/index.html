@@ -3,61 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
     <title>DeepSeek for Kids</title>
     <style>
-        body {
-            font-family: 'Comic Sans MS', cursive, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f9f7fe;
-        }
-        #chatbox {
-            height: 400px;
-            border: 2px solid #d4a5ff;
-            border-radius: 10px;
-            padding: 15px;
-            overflow-y: scroll;
-            background-color: white;
-            margin-bottom: 15px;
-        }
-        #userInput {
-            width: 70%;
-            padding: 10px;
-            border: 2px solid #d4a5ff;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #8a2be2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #7b1fa2;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 8px 12px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .child-message {
-            background-color: #e1f5fe;
-            align-self: flex-start;
-        }
-        .ai-message {
-            background-color: #ede7f6;
-            align-self: flex-end;
-        }
-        #typing {
-            color: #666;
-            font-style: italic;
-        }
+        /* (Keep all your existing styles here) */
     </style>
 </head>
 <body>
@@ -72,10 +21,10 @@
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
         
-        // Backend URL - replace with your actual Render URL
+        // Backend URL
         const BACKEND_URL = "https://curly-disco-bzls.onrender.com/deepseek-proxy";
 
-        // Add a message to the chatbox
+        // Add message to chat
         function addMessage(sender, text) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', sender === 'child' ? 'child-message' : 'ai-message');
@@ -85,54 +34,44 @@
         }
 
         // Send message to API
-        async function sendMessage() {
+        async function handleSendMessage() {
             const childMessage = userInput.value.trim();
             if (!childMessage) return;
         
-            // Show child's message in chat
             addMessage('child', childMessage);
             userInput.value = '';
             sendButton.disabled = true;
         
-            // Show "AI is typing..." indicator
             const typingIndicator = document.createElement('div');
             typingIndicator.id = 'typing';
             typingIndicator.textContent = "AI is thinking...";
             chatbox.appendChild(typingIndicator);
-            chatbox.scrollTop = chatbox.scrollHeight;
-        
-            // Prepare the prompt with child context
-            const CHILD_AGE = 7;
-            const systemPrompt = `[System Note: The user is a ${CHILD_AGE}-year-old child. 
-                Respond in a friendly, encouraging tone. Use simple words and avoid complex topics.]
-                \n\nUser: ${childMessage}`;
         
             try {
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: systemPrompt })
+                    body: JSON.stringify({ 
+                        prompt: `[System Note: Respond like you're talking to a 7-year-old child.]\n\nUser: ${childMessage}`
+                    })
                 });
-        
-                if (!response.ok) throw new Error(`API error: ${response.status}`);
+                
                 const data = await response.json();
-        
-                // Remove typing indicator and show response
                 chatbox.removeChild(typingIndicator);
                 addMessage('ai', data.response);
             } catch (error) {
                 chatbox.removeChild(typingIndicator);
-                addMessage('ai', "Oops! I couldn't connect. Try again later.");
-                console.error("API call failed:", error);
+                addMessage('ai', "Oops! Please try again later.");
+                console.error("API error:", error);
             } finally {
                 sendButton.disabled = false;
             }
         }
 
-        // Event Listeners
-        sendButton.addEventListener('click', sendMessage);
+        // Event Listeners (modern approach)
+        sendButton.addEventListener('click', handleSendMessage);
         userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
+            if (e.key === 'Enter') handleSendMessage();
         });
     </script>
 </body>
