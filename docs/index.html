@@ -80,6 +80,45 @@
         async function sendMessage() {
             const childMessage = userInput.value.trim();
             if (!childMessage) return;
-
-            const CHILD_AGE = 7; // Customize your child's age here
-            const systemPrompt = `[System Note: The user is a ${CHILD_AGE}-year-old child.
+        
+            // Show child's message in chat
+            addMessage('child', childMessage);
+            userInput.value = '';
+        
+            // Show "AI is typing..." indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.id = 'typing';
+            typingIndicator.textContent = "AI is thinking...";
+            chatbox.appendChild(typingIndicator);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        
+            // Prepare the prompt for DeepSeek (with child-friendly prefix)
+            const CHILD_AGE = 7; // Customize age
+            const systemPrompt = `[System Note: The user is a ${CHILD_AGE}-year-old child. 
+                Respond in a friendly, encouraging tone. Use simple words and avoid complex topics.]
+                \n\nUser: ${childMessage}`;
+        
+            try {
+                // Call your Render backend (which proxies to DeepSeek)
+                const response = await fetch(BACKEND_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        prompt: systemPrompt,
+                        // Add other params if needed (e.g., max_tokens, temperature)
+                    })
+                });
+        
+                if (!response.ok) throw new Error(`API error: ${response.status}`);
+                const data = await response.json();
+        
+                // Remove typing indicator and show AI's response
+                chatbox.removeChild(typingIndicator);
+                addMessage('ai', data.response); // Adjust if DeepSeek uses a different key (e.g., data.choices[0].text)
+        
+            } catch (error) {
+                chatbox.removeChild(typingIndicator);
+                addMessage('ai', "Oops! I couldn't connect. Try again later.");
+                console.error("API call failed:", error);
+            }
+        }
