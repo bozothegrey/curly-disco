@@ -54,21 +54,28 @@
             background-color: #ede7f6;
             align-self: flex-end;
         }
+        #typing {
+            color: #666;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <h1>🤖 DeepSeek for Kids</h1>
     <div id="chatbox"></div>
     <input type="text" id="userInput" placeholder="Ask me anything!">
-    <button onclick="sendMessage()">Send</button>
+    <button id="sendButton">Send</button>
 
     <script>
+        // DOM Elements
         const chatbox = document.getElementById('chatbox');
         const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        
+        // Backend URL - replace with your actual Render URL
+        const BACKEND_URL = "https://curly-disco-bzls.onrender.com/deepseek-proxy";
 
-        // Replace with your Render backend URL (e.g., "https://your-app.onrender.com/deepseek-proxy")
-        const BACKEND_URL = "https://curly-disco-bzls.onrender.com/deepseek-proxy"; 
-
+        // Add a message to the chatbox
         function addMessage(sender, text) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message', sender === 'child' ? 'child-message' : 'ai-message');
@@ -77,6 +84,7 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
+        // Send message to API
         async function sendMessage() {
             const childMessage = userInput.value.trim();
             if (!childMessage) return;
@@ -84,6 +92,7 @@
             // Show child's message in chat
             addMessage('child', childMessage);
             userInput.value = '';
+            sendButton.disabled = true;
         
             // Show "AI is typing..." indicator
             const typingIndicator = document.createElement('div');
@@ -92,33 +101,39 @@
             chatbox.appendChild(typingIndicator);
             chatbox.scrollTop = chatbox.scrollHeight;
         
-            // Prepare the prompt for DeepSeek (with child-friendly prefix)
-            const CHILD_AGE = 7; // Customize age
+            // Prepare the prompt with child context
+            const CHILD_AGE = 7;
             const systemPrompt = `[System Note: The user is a ${CHILD_AGE}-year-old child. 
                 Respond in a friendly, encouraging tone. Use simple words and avoid complex topics.]
                 \n\nUser: ${childMessage}`;
         
             try {
-                // Call your Render backend (which proxies to DeepSeek)
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        prompt: systemPrompt,
-                        // Add other params if needed (e.g., max_tokens, temperature)
-                    })
+                    body: JSON.stringify({ prompt: systemPrompt })
                 });
         
                 if (!response.ok) throw new Error(`API error: ${response.status}`);
                 const data = await response.json();
         
-                // Remove typing indicator and show AI's response
+                // Remove typing indicator and show response
                 chatbox.removeChild(typingIndicator);
-                addMessage('ai', data.response); // Adjust if DeepSeek uses a different key (e.g., data.choices[0].text)
-        
+                addMessage('ai', data.response);
             } catch (error) {
                 chatbox.removeChild(typingIndicator);
                 addMessage('ai', "Oops! I couldn't connect. Try again later.");
                 console.error("API call failed:", error);
+            } finally {
+                sendButton.disabled = false;
             }
         }
+
+        // Event Listeners
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
