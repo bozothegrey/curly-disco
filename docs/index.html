@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek for Kids</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f7fe;
+        }
+        #chatbox {
+            height: 400px;
+            border: 2px solid #d4a5ff;
+            border-radius: 10px;
+            padding: 15px;
+            overflow-y: scroll;
+            background-color: white;
+            margin-bottom: 15px;
+        }
+        #userInput {
+            width: 70%;
+            padding: 10px;
+            border: 2px solid #d4a5ff;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #8a2be2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #7b1fa2;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .child-message {
+            background-color: #e1f5fe;
+            align-self: flex-start;
+        }
+        .ai-message {
+            background-color: #ede7f6;
+            align-self: flex-end;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 DeepSeek for Kids</h1>
+    <div id="chatbox"></div>
+    <input type="text" id="userInput" placeholder="Ask me anything!">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const userInput = document.getElementById('userInput');
+
+        // Replace with your Render backend URL (e.g., "https://your-app.onrender.com/deepseek-proxy")
+        const BACKEND_URL = "YOUR_RENDER_BACKEND_URL_HERE"; 
+
+        function addMessage(sender, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender === 'child' ? 'child-message' : 'ai-message');
+            messageDiv.innerHTML = `<b>${sender === 'child' ? 'You' : 'AI'}:</b> ${text}`;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const childMessage = userInput.value.trim();
+            if (!childMessage) return;
+
+            const CHILD_AGE = 7; // Customize your child's age here
+            const systemPrompt = `[System Note: The user is a ${CHILD_AGE}-year-old child.
