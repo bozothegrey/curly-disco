@@ -10,8 +10,12 @@ API_KEY = os.environ.get("DEEPSEEK_API_KEY")  # Store in Render's environment va
 
 @app.route("/deepseek-proxy", methods=["POST"])
 def handle_query():
-    if not request.is_json:  # Reject non-JSON requests
-        return jsonify({"error": "Request must be JSON"}), 415  # 415 error
+    try:
+    data = request.get_json(force=True)  # Force JSON parsing
+    if not data:
+        return jsonify({"error": "Request must be JSON"}), 415
+    except:
+        return jsonify({"error": "Invalid JSON"}), 400
     data = request.json
     child_prompt = data.get("prompt", "")
 
