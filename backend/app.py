@@ -39,6 +39,34 @@ Key requirements:
 3. Ask one follow-up question
 4. Relate to previous topics when possible"""
 
+SUMMARY_PROMPT = """Act as a child development expert analyzing this conversation. Create a structured summary for future reference:
+
+**Child Profile Update**
+1. Observed Interests: Identify 2-3 specific interests the child demonstrated
+2. Learning Patterns: Note any curiosity patterns or learning styles shown
+3. Knowledge Gaps: Highlight misunderstandings to address later
+
+**Educational Strategy**
+1. Concepts Taught: List core concepts covered (max 3)
+2. Teaching Methods: Detail metaphors/analogies that worked well
+3. Engagement Level: Rate 1-5 how engaged the child seemed
+
+**Development Notes**
+1. Curiosity Spark: Suggest 1 related topic to explore next
+2. Parental Note: Flag any concerns (social/emotional/cognitive) with constructive suggestions
+3. Positive Reinforcement: Identify 1 strength to encourage
+
+**Format Requirements**
+- Use child-friendly terms avoid technical jargon
+- Keep each section under 15 words
+- Emphasize interests over weaknesses
+- Write in third-person neutral tone
+
+Conversation:
+{conversation_text}
+
+Effective summary:"""
+
 @app.route("/test-db", methods=["GET"])
 def test_db():
     """Database health check endpoint"""
@@ -145,29 +173,25 @@ def save_conversation(user_id, messages):
         app.logger.error(f"Save failed: {str(e)}")
 
 def generate_summary(messages):
-    """Generate summary with fallback"""
-    try:
-        conversation_text = "\n".join(
-            [f"{m['sender']}: {m['text']}" for m in messages]
-        )
-        prompt = f"""Create a 5-7 word summary focusing on the educational aspect:
-        
-        {conversation_text}"""
-        
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
-            json={
-                "model": "deepseek-chat",
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=10
-        )
-        return response.json()["choices"][0]["message"]["content"].strip()
+    conversation_text = "\n".join([f"{m['sender']}: {m['text']}" for m in messages])
     
-    except Exception as e:
-        app.logger.warning(f"Summary fallback: {str(e)}")
-        return "Conversation about learning new things"
+    prompt = f"""You are an AI teaching assistant specializing in child development. 
+    {SUMMARY_PROMPT}"""
+    
+    response = requests.post(
+        DEEPSEEK_API_URL,
+        headers={"Authorization": f"Bearer {API_KEY}"},
+        json={
+            "model": "deepseek-chat",
+            "messages": [{
+                "role": "user",
+                "content": prompt
+            }],
+            "temperature": 0.3  # Keep outputs consistent
+        }
+    )
+    
+    return response.json()["choices"][0]["message"]["content"]
 
 def extract_topics(text):
     """Simplified topic extraction"""
