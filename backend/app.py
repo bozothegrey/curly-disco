@@ -48,6 +48,36 @@ def get_context(user_id):
         app.logger.error(f"Error fetching context: {str(e)}")
         return ""
 
+@app.route("/network-test")
+def network_test():
+    try:
+        # Test DNS resolution
+        dns_result = os.popen("nslookup api.deepseek.com").read()
+        
+        # Test raw connection
+        curl_result = os.popen("curl -I -m 5 https://api.deepseek.com").read()
+        
+        return jsonify({
+            "dns": dns_result,
+            "curl": curl_result
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
+@app.route("/test-deepseek", methods=["GET"])
+def test_deepseek():
+    try:
+        test_prompt = "Hello, DeepSeek! Please respond with 'OK' if working."
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
+            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": test_prompt}]},
+            timeout=10
+        )
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
 @app.route("/test-db", methods=["GET"])
 def test_db():
     """Database health check endpoint"""
