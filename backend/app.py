@@ -4,80 +4,41 @@ from pymongo import MongoClient
 from datetime import datetime
 import os
 import requests
+import time
+import logging
+from concurrent.futures import ThreadPoolExecutor
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+app.logger.setLevel(logging.INFO)
+
 # MongoDB Configuration
-client = MongoClient(os.getenv("MONGODB_URI"))  # Use environment variable directly
+client = MongoClient(os.getenv("MONGODB_URI"))
 db = client.get_database("kids_chat")
+conversations_col = db["conversations"]
 
-# Create collections with validation
-conversations_col = db.conversations
-users_col = db.users
+# Thread pool for async operations
+executor = ThreadPoolExecutor(max_workers=4)
 
-# Create indexes (only once, consider adding to migration script)
-users_col.create_index([("user_id", 1)], unique=True)
+# Timeout profiles (seconds)
+TIMEOUT_PROFILE = {
+    "simple": 15,  # Short questions
+    "complex": 30, # Long/multi-part questions
+    "fallback": 5  # Emergency responses
+}
 
-def save_conversation(user_id, messages):
-    """Save conversation with AI-generated summary"""
-    try:
-        summary = generate_summary(messages)
-        conversation = {
-            "user_id": user_id,
-            "timestamp": datetime.utcnow(),
-            "messages": messages,
-            "summary": summary,
-            "topics": extract_topics(summary)
-        }
-        conversations_col.insert_one(conversation)
-    except Exception as e:
-        app.logger.error(f"Error saving conversation: {str(e)}")
+# System prompt template
+SYSTEM_PROMPT = """You are a friendly AI tutor for children aged 6-9. 
+Key requirements:
+1. Use simple words and short sentences
+2. Add emojis to make it fun 🎨
+3. Ask one follow-up question
+4. Relate to previous topics when possible"""
 
-def get_context(user_id):
-    """Get conversation context for dynamic prompting"""
-    try:
-        last_convos = conversations_col.find(
-            {"user_id": user_id},
-            sort=[("timestamp", -1)],
-            limit=3
-        )
-        return "\n".join([doc["summary"] for doc in last_convos])
-    except Exception as e:
-        app.logger.error(f"Error fetching context: {str(e)}")
-        return ""
-
-@app.route("/network-test")
-def network_test():
-    try:
-        # Test DNS resolution
-        dns_result = os.popen("nslookup api.deepseek.com").read()
-        
-        # Test raw connection
-        curl_result = os.popen("curl -I -m 5 https://api.deepseek.com").read()
-        
-        return jsonify({
-            "dns": dns_result,
-            "curl": curl_result
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-        
-@app.route("/test-deepseek", methods=["GET"])
-def test_deepseek():
-    try:
-        test_prompt = "Hello, DeepSeek! Please respond with 'OK' if working."
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
-            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": test_prompt}]},
-            timeout=10
-        )
-        return jsonify(response.json())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-        
 @app.route("/test-db", methods=["GET"])
 def test_db():
     """Database health check endpoint"""
@@ -86,35 +47,113 @@ def test_db():
         return jsonify({
             "status": "success",
             "database": "kids_chat",
-            "conversations_count": conversations_col.count_documents({}),
-            "users_count": users_col.count_documents({})
+            "conversations_count": conversations_col.count_documents({})
         })
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """Main chat processing endpoint"""
+    """Main chat endpoint with enhanced logging"""
+    start_time = time.time()
+    
     try:
+        # Validate request
         data = request.get_json()
         if not data or "user_id" not in data or "message" not in data:
+            app.logger.error("Invalid request format")
             return jsonify({"error": "Invalid request format"}), 400
 
         user_id = data["user_id"]
-        user_message = data["message"]
+        user_message = data["message"].strip()
         
-        # Build dynamic prompt
+        app.logger.info(f"New message from {user_id}: {user_message}")
+
+        # Determine timeout tier
+        word_count = len(user_message.split())
+        timeout = TIMEOUT_PROFILE["complex"] if word_count > 8 else TIMEOUT_PROFILE["simple"]
+        
+        # Build prompt with context
         context = get_context(user_id)
-        prompt = f"""[System Note: Previous interactions:
-{context}
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": f"Previous context:\n{context}"},
+            {"role": "user", "content": user_message}
+        ]
 
-Respond like you're talking to a curious child.
-User: {user_message}"""
+        # API call with timing
+        api_start = time.time()
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
+            json={"model": "deepseek-chat", "messages": messages},
+            timeout=timeout
+        )
+        api_time = time.time() - api_start
+        app.logger.info(f"API response time: {api_time:.2f}s")
 
-        # Call DeepSeek API
+        # Handle API errors
+        if response.status_code != 200:
+            app.logger.error(f"API error: {response.text}")
+            return jsonify({"error": "AI service unavailable"}), 500
+
+        # Extract response
+        ai_response = response.json()["choices"][0]["message"]["content"]
+        app.logger.info(f"AI response: {ai_response}")
+
+        # Async save with summary logging
+        executor.submit(
+            save_conversation,
+            user_id,
+            [
+                {"text": user_message, "sender": "child"},
+                {"text": ai_response, "sender": "AI"}
+            ]
+        )
+
+        return jsonify({"response": ai_response})
+
+    except requests.exceptions.Timeout:
+        app.logger.warning("Request timeout")
+        return jsonify({
+            "response": "Hmm, this is taking longer than usual! ⏳ Why don't we talk about your favorite animal instead? 🐾"
+        }), 504
+    except Exception as e:
+        app.logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({"response": "Oops! Let's try that again."}), 500
+
+def save_conversation(user_id, messages):
+    """Save conversation with detailed logging"""
+    try:
+        # Generate and log summary
+        summary = generate_summary(messages)
+        app.logger.info(f"Generated summary: {summary}")
+        
+        conversation = {
+            "user_id": user_id,
+            "timestamp": datetime.utcnow(),
+            "messages": messages,
+            "summary": summary,
+            "topics": extract_topics(summary)
+        }
+        
+        # Insert with timeout
+        conversations_col.insert_one(conversation)
+        app.logger.info(f"Saved conversation for {user_id}")
+
+    except Exception as e:
+        app.logger.error(f"Save failed: {str(e)}")
+
+def generate_summary(messages):
+    """Generate summary with fallback"""
+    try:
+        conversation_text = "\n".join(
+            [f"{m['sender']}: {m['text']}" for m in messages]
+        )
+        prompt = f"""Create a 5-7 word summary focusing on the educational aspect:
+        
+        {conversation_text}"""
+        
         response = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
@@ -124,61 +163,46 @@ User: {user_message}"""
             },
             timeout=10
         )
-        
-        # Handle API errors
-        if response.status_code != 200:
-            return jsonify({
-                "error": "DeepSeek API error",
-                "status_code": response.status_code
-            }), 500
-
-        ai_response = response.json()["choices"][0]["message"]["content"]
-        
-        # Save conversation
-        save_conversation(user_id, [
-            {"text": user_message, "sender": "child"},
-            {"text": ai_response, "sender": "AI"}
-        ])
-        
-        return jsonify({"response": ai_response})
-
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "Request timeout"}), 504
+        return response.json()["choices"][0]["message"]["content"].strip()
+    
     except Exception as e:
-        app.logger.error(f"Chat error: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
-
-def generate_summary(messages):
-    """Generate conversation summary using DeepSeek"""
-    try:
-        conversation_text = "\n".join(
-            [f"{m['sender']}: {m['text']}" for m in messages]
-        )
-        prompt = f"""Summarize this child-AI chat in 1 sentence focusing on learning topics:
-        
-        {conversation_text}"""
-        
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')}"},
-            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]},
-            timeout=5
-        )
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        app.logger.error(f"Summary generation failed: {str(e)}")
-        return "No summary available"
+        app.logger.warning(f"Summary fallback: {str(e)}")
+        return "Conversation about learning new things"
 
 def extract_topics(text):
-    """Extract conversation topics (simplified version)"""
+    """Simplified topic extraction"""
     try:
-        # Basic keyword extraction (replace with proper NLP in production)
         stopwords = {"the", "and", "a", "is", "in", "it"}
-        words = [word.lower() for word in text.split() if word.lower() not in stopwords]
-        return list(set(words[:5]))  # Return first 5 unique non-stopwords
-    except Exception as e:
-        app.logger.error(f"Topic extraction failed: {str(e)}")
+        return [
+            word.lower() for word in text.split() 
+            if word.lower() not in stopwords
+        ][:3]  # Return top 3 keywords
+    except:
         return []
+
+def get_context(user_id):
+    """Get context with caching"""
+    try:
+        last_convos = conversations_col.find(
+            {"user_id": user_id},
+            sort=[("timestamp", -1)],
+            limit=3
+        ).limit(3)
+        return "\n".join([doc["summary"] for doc in last_convos])
+    except:
+        return ""
+
+@app.route("/conversations/<user_id>", methods=["GET"])
+def get_conversations(user_id):
+    """Get stored conversations for testing"""
+    try:
+        convos = list(conversations_col.find(
+            {"user_id": user_id},
+            {"_id": 0, "messages": 0}  # Exclude messages and IDs
+        ).sort("timestamp", -1))
+        return jsonify(convos)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
