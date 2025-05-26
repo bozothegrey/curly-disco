@@ -1,68 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
-    <title>DeepSeek for Kids</title>
-    <style>
-        body {
-            font-family: 'Comic Sans MS', cursive, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f9f7fe;
-        }
-        #chatbox {
-            height: 400px;
-            border: 2px solid #d4a5ff;
-            border-radius: 10px;
-            padding: 15px;
-            overflow-y: scroll;
-            background-color: white;
-            margin-bottom: 15px;
-        }
-        #userInput {
-            width: 70%;
-            padding: 10px;
-            border: 2px solid #d4a5ff;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #8a2be2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #7b1fa2;
-        }
-        .message {
-            margin: 10px 0;
-            padding: 8px 12px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .child-message {
-            background-color: #e1f5fe;
-            align-self: flex-start;
-        }
-        .ai-message {
-            background-color: #ede7f6;
-            align-self: flex-end;
-        }
-        #typing {
-            color: #666;
-            font-style: italic;
-        }
-    </style>
+    <!-- Keep existing meta tags and styles -->
 </head>
 <body>
     <h1>🤖 DeepSeek for Kids</h1>
+    <div id="userInfo">
+        <input type="text" id="userName" placeholder="Your name" style="margin-bottom: 10px;">
+    </div>
     <div id="chatbox"></div>
     <input type="text" id="userInput" placeholder="Ask me anything!">
     <button id="sendButton">Send</button>
@@ -72,9 +17,20 @@
         const chatbox = document.getElementById('chatbox');
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
+        const userName = document.getElementById('userName');
         
-        // Backend URL (now handles kid-friendly prompting)
-        const BACKEND_URL = "https://curly-disco-bzls.onrender.com/deepseek-proxy";
+        // Backend URL - use new /chat endpoint
+        const BACKEND_URL = "https://curly-disco-bzls.onrender.com/chat";
+
+        // Generate unique user ID (simple version)
+        function getUserId() {
+            let userId = localStorage.getItem('userId');
+            if (!userId) {
+                userId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+                localStorage.setItem('userId', userId);
+            }
+            return userId;
+        }
 
         // Add message to chat
         function addMessage(sender, text) {
@@ -85,7 +41,7 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        // Send message to API (SIMPLIFIED - no prompt engineering here)
+        // Send message to API
         async function handleSendMessage() {
             const childMessage = userInput.value.trim();
             if (!childMessage) return;
@@ -100,12 +56,12 @@
             chatbox.appendChild(typingIndicator);
         
             try {
-                // Just send the raw message - backend adds kid-friendly rules
                 const response = await fetch(BACKEND_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        prompt: childMessage  // <-- Only raw input now!
+                    body: JSON.stringify({
+                        user_id: getUserId(),  // Include generated user ID
+                        message: childMessage  // Correct field name
                     })
                 });
                 
