@@ -36,6 +36,14 @@ def get_context(user_id):
     )
     return "\n".join([doc["summary"] for doc in last_convos])
 
+@app.route("/test-db")
+def test_db():
+    try:
+        client.admin.command('ping')
+        return jsonify({"status": "MongoDB connected!"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.json
