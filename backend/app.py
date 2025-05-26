@@ -7,8 +7,8 @@ import requests
 
 # MongoDB Atlas Connection
 client = MongoClient(os.getenv("MONGODB_URI"))
-db = client.get_database("kids_chat")
-users_col = db["users"]
+db = client["kids_chat"]
+db.users.create_index([("user_id", 1)], unique=True)  # use user 1
 conversations_col = db["conversations"]
 
 app = Flask(__name__)
