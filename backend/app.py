@@ -180,7 +180,7 @@ def generate_summary(messages):
     
     response = requests.post(
         "https://api.deepseek.com/v1/chat/completions",
-        headers={"Authorization": f"Bearer {API_KEY}"},
+        headers={"Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY')"},
         json={
             "model": "deepseek-chat",
             "messages": [{
