@@ -15,7 +15,7 @@ setup_logging()
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:8000", "http://127.0.0.1:8000"],
+        "origins": ["http://localhost:8000", "http://127.0.0.1:8000","https://bozothegrey.github.io/curly-disco/"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
