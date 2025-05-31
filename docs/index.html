@@ -3,196 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 DeepSeek for Kids</title>
-    <style>
-        body {
-            font-family: 'Comic Sans MS', cursive, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        
-        h1 {
-            text-align: center;
-            color: #4a5568;
-            margin-bottom: 20px;
-        }
-        
-        #userInfo {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        
-        #userName {
-            padding: 10px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 16px;
-            width: 200px;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background: #4299e1;
-            color: white;
-        }
-        
-        .btn-success {
-            background: #48bb78;
-            color: white;
-        }
-        
-        .btn-danger {
-            background: #f56565;
-            color: white;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        #chatbox {
-            height: 400px;
-            overflow-y: auto;
-            border: 2px solid #e2e8f0;
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 20px;
-            background: #f7fafc;
-        }
-        
-        .message {
-            margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        
-        .child-message {
-            background: #bee3f8;
-            margin-left: auto;
-            text-align: right;
-        }
-        
-        .ai-message {
-            background: #c6f6d5;
-            margin-right: auto;
-        }
-        
-        .system-message {
-            background: #fed7d7;
-            text-align: center;
-            font-style: italic;
-            max-width: 100%;
-        }
-        
-        .input-area {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        
-        #userInput {
-            flex: 1;
-            padding: 15px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 16px;
-        }
-        
-        #sendButton {
-            padding: 15px 25px;
-            background: #4299e1;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        
-        #typing {
-            font-style: italic;
-            color: #718096;
-            padding: 10px;
-            text-align: center;
-        }
-        
-        .status-indicator {
-            text-align: center;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            font-weight: bold;
-        }
-        
-        .status-active {
-            background: #c6f6d5;
-            color: #2d5a3d;
-        }
-        
-        .status-inactive {
-            background: #fed7d7;
-            color: #742a2a;
-        }
-    </style>
+    <title>DeepSeek for Kids</title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="light-mode">
     <div class="container">
-        <h1>🤖 DeepSeek for Kids</h1>
-        
-        <div id="userInfo">
-            <input type="text" id="userName" placeholder="Your name">
+        <header>
+            <h1>DeepSeek for Kids</h1>
+            <button id="themeToggle" class="theme-btn">🌙</button>
+        </header>
+
+        <div class="user-controls">
+            <select id="userSelect" class="user-select">
+                <option value="">Select a user</option>
+            </select>
+            <input type="text" id="userName" placeholder="Your name" disabled>
         </div>
-        
+
         <div class="controls">
-            <button id="newConversationBtn" class="btn btn-success">🆕 New Conversation</button>
-            <button id="endConversationBtn" class="btn btn-danger">🔚 End Conversation</button>
-            <button id="statusBtn" class="btn btn-primary">📊 Check Status</button>
+            <button id="newConversationBtn" class="btn">New Chat</button>
+            <button id="endConversationBtn" class="btn">End Chat</button>
         </div>
-        
-        <div id="statusIndicator" class="status-indicator" style="display: none;"></div>
-        
+
+        <div id="statusIndicator"></div>
         <div id="chatbox"></div>
-        
+
         <div class="input-area">
-            <input type="text" id="userInput" placeholder="Ask me anything!">
-            <button id="sendButton" class="btn btn-primary">Send</button>
+            <input type="text" id="userInput" placeholder="Ask me anything">
+            <button id="sendButton" class="btn">Send</button>
         </div>
     </div>
 
+    <script src="js/config.js"></script>
     <script src="js/conversation-manager.js"></script>
     <script src="js/chat-interface.js"></script>
     <script src="js/app.js"></script>

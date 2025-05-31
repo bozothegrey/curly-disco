@@ -5,7 +5,8 @@ class ChatInterface {
         this.chatbox = document.getElementById('chatbox');
         this.userInput = document.getElementById('userInput');
         this.sendButton = document.getElementById('sendButton');
-        this.BACKEND_URL = "https://curly-disco-bzls.onrender.com/chat";
+        // Use centralized config
+        this.BACKEND_URL = Config.endpoints.chat;
     }
     
     addMessage(sender, text, isSystem = false) {

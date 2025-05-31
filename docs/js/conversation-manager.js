@@ -42,20 +42,18 @@ class ConversationManager {
     saveConversationOnExit() {
         if (!this.conversationActive) return;
         
-        // Use sendBeacon for reliable transmission during page unload
         const data = JSON.stringify({
             user_id: this.userId,
             action: 'force_end_conversation',
             timestamp: new Date().toISOString()
         });
         
-        navigator.sendBeacon('https://curly-disco-bzls.onrender.com/api/end-conversation', data);
+        navigator.sendBeacon(Config.endpoints.endConversation, data);
     }
     
     autoSaveConversation() {
-        // Periodic auto-save during conversation
         if (this.conversationActive) {
-            fetch('https://curly-disco-bzls.onrender.com/api/auto-save', {
+            fetch(Config.endpoints.autoSave, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -66,21 +64,11 @@ class ConversationManager {
         }
     }
     
-    async startNewConversation() {
-        this.conversationActive = true;
-        this.conversationId = Date.now().toString();
-        
-        // Update UI
-        this.updateStatusIndicator('🟢 New conversation started!', 'status-active');
-        
-        return true;
-    }
-    
     async endConversation() {
         if (!this.conversationActive) return;
         
         try {
-            const response = await fetch('https://curly-disco-bzls.onrender.com/api/end-conversation', {
+            const response = await fetch(Config.endpoints.endConversation, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -103,7 +91,7 @@ class ConversationManager {
     
     async checkStatus() {
         try {
-            const response = await fetch(`https://curly-disco-bzls.onrender.com/api/conversation-status/${this.userId}`);
+            const response = await fetch(`${Config.endpoints.conversationStatus}/${this.userId}`);
             const data = await response.json();
             
             if (data.active) {
