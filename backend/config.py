@@ -13,6 +13,9 @@ class Config:
     # Conversation Settings
     CONVERSATION_TIMEOUT = 30 * 60  # 30 minutes in seconds
     
+    # Conversation topic change
+    TOPIC_OVERLAP_THRESHOLD = 0.3
+
     # Timeout Profiles
     TIMEOUT_PROFILE = {
         "simple": 15,
@@ -39,7 +42,7 @@ Key requirements:
 
 IMPORTANT: If the child says they want to end the conversation, stop the chat, 
 or use phrases like "let's end", "done talking", "finish this", etc., 
-append "CHAT-ENDED" to your response and say a nice goodbye."""
+say a nice goodbye and append "CHAT-ENDED" to your response """
 
 
     SUMMARY_PROMPT = """Act as a child development expert analyzing this conversation. Create a structured summary for future reference:

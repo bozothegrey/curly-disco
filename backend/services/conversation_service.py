@@ -9,26 +9,50 @@ logger = logging.getLogger(__name__)
 class ConversationService:
     def __init__(self):
         self.conversation_model = ConversationModel()
-        self.ai_service = AIService()
+        # In-memory cache for last topics (could also store in DB)
+        self.user_last_topic = {}
+
+    def extract_keywords(self, text):
+        # Basic keyword extraction; replace with NLP for better accuracy
+        stopwords = set(["the", "and", "a", "is", "in", "it", "to", "of", "for", "on", "with", "as", "at", "by"])
+        words = [w.strip(".,!?").lower() for w in text.split()]
+        return set(w for w in words if w not in stopwords and len(w) > 2)
     
+    def extract_topics(self, text):
+        return self.extract_keywords(text)[:3]
+
+    def is_topic_changed(self, user_id, user_message):
+        new_keywords = self.extract_keywords(user_message)
+        last_keywords = self.user_last_topic.get(user_id, set())
+
+        # Consider topic changed if overlap is small
+        overlap = new_keywords & last_keywords
+        logger.info(f"Topic overlap: {overlap}")
+        # If less than 30% of keywords overlap, consider it a new topic
+        if last_keywords and (len(overlap) / max(len(last_keywords), 1)) < Config.TOPIC_OVERLAP_THRESHOLD:
+            return True
+        # Update last topic
+        self.user_last_topic[user_id] = new_keywords
+        return False
+
     def detect_conversation_start(self, user_id, user_message):
         """Detect if this is the start of a new conversation"""
         try:
             # Check for explicit conversation starters
             greeting_patterns = [
-                "hello", "hi", "hey", "good morning", "good afternoon", 
+                "hello", "hi", "hey", "good morning", "good afternoon",
                 "good evening", "start", "new chat", "begin"
             ]
-            
+
             message_lower = user_message.lower()
             explicit_start = any(pattern in message_lower for pattern in greeting_patterns)
-            
+
             # Check time-based start - only look for COMPLETED conversations
             last_conversation = self.conversation_model.conversations_col.find_one(
-                {"user_id": user_id, "conversation_complete": True},  # Only completed conversations
+                {"user_id": user_id, "conversation_complete": True},
                 sort=[("timestamp", -1)]
             )
-            
+
             time_based_start = True
             if last_conversation:
                 time_diff = datetime.utcnow() - last_conversation["timestamp"]
@@ -36,58 +60,55 @@ class ConversationService:
                 logger.info(f"Time since last COMPLETED conversation: {time_diff.total_seconds():.1f}s (timeout: {Config.CONVERSATION_TIMEOUT}s)")
             else:
                 logger.info("No completed conversations found - treating as first conversation")
-            
+
             # Check if there's already an active conversation
             active_conversation = self.conversation_model.conversations_col.find_one(
                 {"user_id": user_id, "conversation_complete": {"$ne": True}}
             )
-            
+
+            # Check for topic change if conversation is active
+            topic_changed = False
             if active_conversation:
-                logger.info("Active conversation already exists - not starting new one")
-                return False
-            
+                topic_changed = self.is_topic_changed(user_id, user_message)
+                if topic_changed:
+                    logger.info("Topic changed detected - ending previous conversation and starting new one")
+                    # Mark previous conversation as ended
+                    self.conversation_model.mark_conversation_ended(user_id, end_reason="subject_change")
+                    # Clear last topic so next message starts fresh
+                    self.user_last_topic[user_id] = self.extract_keywords(user_message)
+                    return True
+                else:
+                    logger.info("Active conversation already exists - not starting new one")
+                    return False
+
             is_start = explicit_start or time_based_start or last_conversation is None
-            
+
             if is_start:
                 logger.info(f"Conversation start detected - Explicit: {explicit_start}, Time-based: {time_based_start}, No history: {last_conversation is None}")
-            
+
+            # Always update last topic on new conversation start
+            self.user_last_topic[user_id] = self.extract_keywords(user_message)
+
             return is_start
-            
+
         except Exception as e:
             logger.error(f"Error detecting conversation start: {str(e)}")
             return True
-
-
+        
     
     def detect_conversation_end(self, ai_response, user_message):
-        """Detect if conversation should end based on AI response and user message"""
+        """Detect if conversation should end based only on AI response (CHAT-ENDED marker)."""
         try:
-            # Check if AI detected end
+            # Only end if AI detected end marker
             ai_detected_end = "CHAT-ENDED" in ai_response
-            
-            # Expanded farewell patterns - be more inclusive
-            farewell_patterns = [
-                "bye", "goodbye", "see you", "thanks", "thank you", 
-                "i'm done", "that's all", "gotta go", "i have to go",
-                "end this conversation", "let's end", "finish this chat",
-                "stop talking", "i want to stop", "conversation over",
-                "chat over", "done talking", "finished"
-            ]
-            
-            user_message_lower = user_message.lower()
-            user_farewell = any(pattern in user_message_lower for pattern in farewell_patterns)
-            
-            if user_farewell:
-                logger.info(f"User farewell detected: '{user_message}' contains farewell pattern")
-            
-            return ai_detected_end or user_farewell
-            
+            if ai_detected_end:
+                logger.info("AI signaled end of conversation with CHAT-ENDED marker.")
+            return ai_detected_end
         except Exception as e:
             logger.error(f"Error detecting conversation end: {str(e)}")
             return False
-    
 
-    
+
     def process_chat_message(self, user_id, user_message, force_start=False):
         """Process a chat message and return response"""
         try:
@@ -160,11 +181,4 @@ class ConversationService:
             logger.error(f"Error checking conversation status: {str(e)}")
             return False, True
     
-    def extract_topics(self, text):
-        """Extract topics from text (simplified)"""
-        try:
-            stopwords = {"the", "and", "a", "is", "in", "it", "to", "of", "for"}
-            words = [word.lower().strip(".,!?") for word in text.split()]
-            return [word for word in words if word not in stopwords and len(word) > 2][:3]
-        except:
-            return []
+
