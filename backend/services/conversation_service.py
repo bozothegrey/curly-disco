@@ -11,6 +11,7 @@ class ConversationService:
         self.conversation_model = ConversationModel()
         # In-memory cache for last topics (could also store in DB)
         self.user_last_topic = {}
+        self.ai_service = AIService()
 
     def extract_keywords(self, text):
         # Basic keyword extraction; replace with NLP for better accuracy
