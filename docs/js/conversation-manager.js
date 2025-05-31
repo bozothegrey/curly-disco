@@ -1,37 +1,32 @@
-// Conversation management logic
 class ConversationManager {
     constructor() {
         this.conversationActive = false;
         this.conversationId = null;
-        this.userId = this.getUserId();
+        this.userId = null; // Will be set when user is selected
+        this.currentUser = null; // Store full user object
         this.setupEventListeners();
     }
     
-    getUserId() {
-        let userId = localStorage.getItem('userId');
-        if (!userId) {
-            userId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-            localStorage.setItem('userId', userId);
-        }
-        return userId;
+    setUser(user) {
+        this.userId = user.id; // Use the ID from JSON
+        this.currentUser = user;
+        console.log(`User set: ${user.name} (ID: ${user.id})`);
     }
     
     setupEventListeners() {
-        // Primary approach - pagehide is more reliable than beforeunload
+        // Page close handlers
         window.addEventListener('pagehide', (event) => {
             if (this.conversationActive) {
                 this.saveConversationOnExit();
             }
         });
         
-        // Fallback for older browsers
         window.addEventListener('beforeunload', (event) => {
             if (this.conversationActive) {
                 this.saveConversationOnExit();
             }
         });
         
-        // Handle visibility change (tab switching, minimizing)
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.conversationActive) {
                 this.autoSaveConversation();
@@ -42,17 +37,17 @@ class ConversationManager {
     saveConversationOnExit() {
         if (!this.conversationActive) return;
         
-        const data = JSON.stringify({
-            user_id: this.userId,
-            action: 'force_end_conversation',
-            timestamp: new Date().toISOString()
-        });
+        // Create FormData instead of JSON for sendBeacon compatibility
+        const formData = new FormData();
+        formData.append('user_id', this.userId);
+        formData.append('action', 'force_end_conversation');
+        formData.append('timestamp', new Date().toISOString());
         
-        navigator.sendBeacon(Config.endpoints.endConversation, data);
+        navigator.sendBeacon(Config.endpoints.endConversation, formData);
     }
     
     autoSaveConversation() {
-        if (this.conversationActive) {
+        if (this.conversationActive && this.userId) {
             fetch(Config.endpoints.autoSave, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -64,8 +59,22 @@ class ConversationManager {
         }
     }
     
+    async startNewConversation() {
+        if (!this.userId) {
+            this.updateStatusIndicator('❌ Please select a user first', 'status-inactive');
+            return false;
+        }
+        
+        this.conversationActive = true;
+        this.conversationId = Date.now().toString();
+        
+        this.updateStatusIndicator(`🟢 New conversation started for ${this.currentUser.name}!`, 'status-active');
+        
+        return true;
+    }
+    
     async endConversation() {
-        if (!this.conversationActive) return;
+        if (!this.conversationActive || !this.userId) return false;
         
         try {
             const response = await fetch(Config.endpoints.endConversation, {
@@ -90,16 +99,21 @@ class ConversationManager {
     }
     
     async checkStatus() {
+        if (!this.userId) {
+            this.updateStatusIndicator('❌ No user selected', 'status-inactive');
+            return null;
+        }
+        
         try {
             const response = await fetch(`${Config.endpoints.conversationStatus}/${this.userId}`);
             const data = await response.json();
             
             if (data.active) {
                 this.conversationActive = true;
-                this.updateStatusIndicator('🟢 Conversation is active', 'status-active');
+                this.updateStatusIndicator(`🟢 ${this.currentUser.name} has an active conversation`, 'status-active');
             } else {
                 this.conversationActive = false;
-                this.updateStatusIndicator('🔴 No active conversation', 'status-inactive');
+                this.updateStatusIndicator(`🔴 No active conversation for ${this.currentUser.name}`, 'status-inactive');
             }
             
             return data;
@@ -112,13 +126,15 @@ class ConversationManager {
     
     updateStatusIndicator(message, className) {
         const indicator = document.getElementById('statusIndicator');
-        indicator.textContent = message;
-        indicator.className = `status-indicator ${className}`;
-        indicator.style.display = 'block';
-        
-        // Hide after 3 seconds
-        setTimeout(() => {
-            indicator.style.display = 'none';
-        }, 3000);
+        if (indicator) {
+            indicator.textContent = message;
+            indicator.className = `status-indicator ${className}`;
+            indicator.style.display = 'block';
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 3000);
+        }
     }
 }

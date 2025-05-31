@@ -11,31 +11,45 @@ executor = ThreadPoolExecutor(max_workers=2)
 
 @conversation_bp.route("/api/end-conversation", methods=["POST"])
 def end_conversation():
-    """Handle forced conversation end"""
+    """Handle forced conversation end with enhanced logging"""
     try:
-        data = request.get_json() or {}
+        # Handle both JSON and FormData
+        if request.is_json:
+            data = request.get_json() or {}
+        else:
+            # Handle FormData from sendBeacon
+            data = {
+                'user_id': request.form.get('user_id'),
+                'action': request.form.get('action', 'page_close')
+            }
+        
         user_id = data.get("user_id")
+        end_reason = data.get("action", "page_close")
         
         if not user_id:
             return jsonify({"error": "User ID required"}), 400
         
         conversation_model = ConversationModel()
-        success = conversation_model.mark_conversation_ended(
-            user_id, 
-            data.get("action", "page_close")
-        )
+        success = conversation_model.mark_conversation_ended(user_id, end_reason)
         
         if success:
+            logger.info(f"🔚 FORCED CONVERSATION END: User {user_id}")
+            logger.info(f"📝 End reason: {end_reason}")
+            
+            # Clear session messages
+            from routes.chat_routes import clear_session_messages
+            clear_session_messages(user_id)
+            
             # Generate final summary asynchronously
             summary_service = SummaryService()
             executor.submit(summary_service.generate_final_session_summary, user_id)
         
-        logger.info(f"Conversation ended for {user_id}: {data.get('action', 'unknown')}")
         return jsonify({"status": "conversation_ended"})
         
     except Exception as e:
-        logger.error(f"Error ending conversation: {str(e)}")
+        logger.error(f"❌ Error ending conversation: {str(e)}")
         return jsonify({"error": "Failed to end conversation"}), 500
+
 
 @conversation_bp.route("/api/auto-save", methods=["POST"])
 def auto_save():

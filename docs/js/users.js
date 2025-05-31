@@ -5,13 +5,35 @@ const users = [];
 async function loadUsers() {
     try {
         const response = await fetch('users.json');
-        const data = await response.json();
-        users.push(...data);
-        populateUserSelect();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const users = await response.json();
+        
+        const userSelect = document.getElementById('userSelect');
+        if (!userSelect) {
+            console.error('userSelect element not found');
+            return users;
+        }
+        
+        // Clear existing options except the first one
+        userSelect.innerHTML = '<option value="">Select a user</option>';
+        
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id; // Use ID as value
+            option.textContent = user.name; // Display name
+            userSelect.appendChild(option);
+        });
+        
+        console.log('Users loaded successfully:', users);
+        return users; // Return users for app.js to store
     } catch (error) {
-        console.error("Error loading users:", error);
+        console.error('Failed to load users:', error);
+        return [];
     }
 }
+
 
 // Populate the user dropdown
 function populateUserSelect() {

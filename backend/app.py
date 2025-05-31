@@ -13,7 +13,14 @@ setup_logging()
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:8000", "http://127.0.0.1:8000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 
 # Register blueprints
 app.register_blueprint(chat_bp)

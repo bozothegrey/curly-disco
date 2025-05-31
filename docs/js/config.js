@@ -32,9 +32,16 @@ const Config = {
     }
 };
 
-// Log current configuration for debugging
-console.log(`Environment: ${Config.environment}`);
+// Debug logging
+console.log(`Environment: ${Config.isLocal ? 'development' : 'production'}`);
 console.log(`Backend URL: ${Config.backendUrl}`);
+console.log(`Chat endpoint: ${Config.endpoints.chat}`);
 
-// Make Config available globally or export it
+// Test backend connectivity
+fetch(Config.endpoints.health)
+    .then(response => response.json())
+    .then(data => console.log('Backend health check:', data))
+    .catch(error => console.error('Backend connection failed:', error));
+
 window.Config = Config;
+

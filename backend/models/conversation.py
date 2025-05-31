@@ -83,13 +83,19 @@ class ConversationModel:
     def update_last_activity(self, user_id):
         """Update the last activity timestamp"""
         try:
-            self.conversations_col.update_one(
+            # Remove the sort parameter - updateOne doesn't support it
+            result = self.conversations_col.update_one(
                 {"user_id": user_id, "conversation_complete": {"$ne": True}},
-                {"$set": {"last_activity": datetime.utcnow()}},
-                sort=[("timestamp", -1)]
+                {"$set": {"last_activity": datetime.utcnow()}}
             )
+            
+            # If no active conversation found, that's okay
+            if result.matched_count == 0:
+                logger.info(f"No active conversation found to update for {user_id}")
+                
         except Exception as e:
             logger.error(f"Failed to update activity for {user_id}: {str(e)}")
+
     
     def get_conversations_by_user(self, user_id):
         """Get all conversations for a user (excluding messages)"""
@@ -116,18 +122,30 @@ class ConversationModel:
     def update_session_summary(self, user_id, session_summary, message_count):
         """Update the final conversation with session summary"""
         try:
-            self.conversations_col.update_one(
+            # Find the most recent conversation for this user first
+            recent_conversation = self.conversations_col.find_one(
                 {"user_id": user_id, "conversation_end": True},
-                {
-                    "$set": {
-                        "session_summary": session_summary,
-                        "session_message_count": message_count
-                    }
-                },
                 sort=[("timestamp", -1)]
             )
+            
+            if recent_conversation:
+                # Update by _id instead of using sort in update_one
+                result = self.conversations_col.update_one(
+                    {"_id": recent_conversation["_id"]},
+                    {
+                        "$set": {
+                            "session_summary": session_summary,
+                            "session_message_count": message_count
+                        }
+                    }
+                )
+                logger.info(f"Updated session summary for conversation {recent_conversation['_id']}")
+            else:
+                logger.warning(f"No conversation with conversation_end=True found for {user_id}")
+                
         except Exception as e:
             logger.error(f"Failed to update session summary for {user_id}: {str(e)}")
+
     
     def health_check(self):
         """Check database connection health"""

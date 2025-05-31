@@ -23,40 +23,70 @@ class ConversationService:
             message_lower = user_message.lower()
             explicit_start = any(pattern in message_lower for pattern in greeting_patterns)
             
-            # Check time-based start (no activity for timeout period)
-            last_conversation = self.conversation_model.get_last_conversation(user_id)
+            # Check time-based start - only look for COMPLETED conversations
+            last_conversation = self.conversation_model.conversations_col.find_one(
+                {"user_id": user_id, "conversation_complete": True},  # Only completed conversations
+                sort=[("timestamp", -1)]
+            )
             
             time_based_start = True
             if last_conversation:
                 time_diff = datetime.utcnow() - last_conversation["timestamp"]
                 time_based_start = time_diff.total_seconds() > Config.CONVERSATION_TIMEOUT
+                logger.info(f"Time since last COMPLETED conversation: {time_diff.total_seconds():.1f}s (timeout: {Config.CONVERSATION_TIMEOUT}s)")
+            else:
+                logger.info("No completed conversations found - treating as first conversation")
             
-            return explicit_start or time_based_start or last_conversation is None
+            # Check if there's already an active conversation
+            active_conversation = self.conversation_model.conversations_col.find_one(
+                {"user_id": user_id, "conversation_complete": {"$ne": True}}
+            )
+            
+            if active_conversation:
+                logger.info("Active conversation already exists - not starting new one")
+                return False
+            
+            is_start = explicit_start or time_based_start or last_conversation is None
+            
+            if is_start:
+                logger.info(f"Conversation start detected - Explicit: {explicit_start}, Time-based: {time_based_start}, No history: {last_conversation is None}")
+            
+            return is_start
             
         except Exception as e:
             logger.error(f"Error detecting conversation start: {str(e)}")
-            return True  # Default to new conversation on error
+            return True
+
+
     
     def detect_conversation_end(self, ai_response, user_message):
-        """Detect if conversation should end"""
+        """Detect if conversation should end based on AI response and user message"""
         try:
             # Check if AI detected end
             ai_detected_end = "CHAT-ENDED" in ai_response
             
-            # Check user farewell patterns
+            # Expanded farewell patterns - be more inclusive
             farewell_patterns = [
                 "bye", "goodbye", "see you", "thanks", "thank you", 
-                "i'm done", "that's all", "gotta go", "i have to go"
+                "i'm done", "that's all", "gotta go", "i have to go",
+                "end this conversation", "let's end", "finish this chat",
+                "stop talking", "i want to stop", "conversation over",
+                "chat over", "done talking", "finished"
             ]
             
             user_message_lower = user_message.lower()
             user_farewell = any(pattern in user_message_lower for pattern in farewell_patterns)
+            
+            if user_farewell:
+                logger.info(f"User farewell detected: '{user_message}' contains farewell pattern")
             
             return ai_detected_end or user_farewell
             
         except Exception as e:
             logger.error(f"Error detecting conversation end: {str(e)}")
             return False
+    
+
     
     def process_chat_message(self, user_id, user_message, force_start=False):
         """Process a chat message and return response"""
