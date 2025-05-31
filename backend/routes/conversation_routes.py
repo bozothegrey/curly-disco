@@ -95,12 +95,34 @@ def get_conversation_status(user_id):
         return jsonify({"error": "Status check failed"}), 500
 
 @conversation_bp.route("/conversations/<user_id>", methods=["GET"])
+#Raw data: /conversations/2
+#Summary: /conversations/2?summary=true
 def get_conversations(user_id):
-    """Get stored conversations for a user"""
+    """Get stored conversations for a user (raw or summary)"""
     try:
         conversation_model = ConversationModel()
         conversations = conversation_model.get_conversations_by_user(user_id)
-        return jsonify(conversations)
+        
+        # Check for ?summary=true in the query string
+        summary = request.args.get('summary', 'false').lower() == 'true'
+        if summary:
+            formatted = []
+            for conv in conversations:
+                formatted.append({
+                    'timestamp': conv['timestamp'].isoformat(),
+                    'summary': conv.get('summary', 'No summary'),
+                    'topics': conv.get('topics', []),
+                    'complete': conv.get('conversation_complete', False),
+                    'message_count': len(conv.get('messages', []))
+                })
+            return jsonify({
+                'user_id': user_id,
+                'conversation_count': len(formatted),
+                'conversations': formatted
+            })
+        else:
+            return jsonify(conversations)
     except Exception as e:
         logger.error(f"Error getting conversations: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
