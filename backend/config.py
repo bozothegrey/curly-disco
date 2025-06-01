@@ -11,7 +11,7 @@ class Config:
     DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
     
     # Conversation Settings
-    CONVERSATION_TIMEOUT = 30 * 60  # 30 minutes in seconds
+    CONVERSATION_TIMEOUT = 5 * 60  # 30 minutes in seconds
     
     # Conversation topic change
     TOPIC_OVERLAP_THRESHOLD = 0.3
