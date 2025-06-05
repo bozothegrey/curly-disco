@@ -13,20 +13,23 @@ setup_logging()
 
 # Initialize Flask app
 app = Flask(__name__)
-# Simplified CORS configuration
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Get allowed origins from environment or use defaults
+ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://localhost:8000,https://bozothegrey.github.io').split(',')
 
-@app.after_request
-def add_cors_headers(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    return response
+# Configure CORS for multiple allowed origins
+CORS(app, resources={
+    r"/*": {
+        "origins": ALLOWED_ORIGINS,
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "supports_credentials": True
+    }
+})
 
 # Register blueprints
-app.register_blueprint(chat_bp)
 app.register_blueprint(conversation_bp)
 app.register_blueprint(health_bp)
+app.register_blueprint(chat_bp)
 
 if __name__ == "__main__":
     #checking env
