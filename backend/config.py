@@ -11,7 +11,7 @@ class Config:
     DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
     
     # Conversation Settings
-    CONVERSATION_TIMEOUT = 5 * 60  # 30 minutes in seconds
+    CONVERSATION_TIMEOUT = 5 * 60  # 5 minutes in seconds
     
     # Conversation topic change
     TOPIC_OVERLAP_THRESHOLD = 0.3
@@ -31,7 +31,7 @@ class Config:
     PORT = int(os.environ.get("PORT", 10000))
     
     # System Prompts
-    SYSTEM_PROMPT = """You are a friendly AI tutor for children aged 6-9. 
+    SYSTEM_PROMPT = """You are a friendly AI tutor for children aged 6-12. 
 Key requirements:
 1. Use simple words and short sentences
 2. Add emojis to make it fun only if the user asks 🎨
@@ -45,15 +45,17 @@ or use phrases like "let's end", "done talking", "finish this", etc.,
 say a nice goodbye and append "CHAT-ENDED" to your response """
 
 
-    SUMMARY_PROMPT = """Act as a child development expert analyzing this conversation. Create a structured summary for future reference:
+    TOPICS_PROMPT = """This is an online conversation between an AI and a child: 
+    {conversation_text}
+    
+    You will now write a list of topics covered in this conversation as a sequence of words separated by commas:"""
 
-**Child Profile Update**
-1. Observed Interests: Identify 2-3 specific interests the child demonstrated
-2. Learning Patterns: Note any curiosity patterns or learning styles shown
-3. Knowledge Gaps: Highlight misunderstandings to address later
+    SUMMARY_PROMPT = """Act as a child development expert analyzing this conversation. Create or, if a previous profile is provided, 
+    update the child profile in structured form for future reference by a parent or guardian:
 
+    
 **Educational Strategy**
-1. Concepts Taught: List core concepts covered (max 3)
+1. Learning Patterns: Note any curiosity patterns or learning styles shown
 2. Teaching Methods: Detail metaphors/analogies that worked well
 3. Engagement Level: Rate 1-5 how engaged the child seemed
 
@@ -62,14 +64,14 @@ say a nice goodbye and append "CHAT-ENDED" to your response """
 2. Parental Note: Flag any concerns (social/emotional/cognitive) with constructive suggestions
 3. Positive Reinforcement: Identify 1 strength to encourage
 
-**Format Requirements**
-- Use child-friendly terms avoid technical jargon
+
 - Keep each section under 15 words
-- Emphasize interests over weaknesses
 - Write in third-person neutral tone
 
 Conversation:
 {conversation_text}
 
-Effective summary:"""
+Previous Child Profile:
+{previous_profile}
 
+Updated profile:"""

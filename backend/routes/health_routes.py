@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 health_bp = Blueprint('health', __name__)
 
-@health_bp.route("/test-db", methods=["GET"])
+@health_bp.route("/test-db", methods=["GET", "OPTIONS"])
 def test_db():
     """Database health check endpoint"""
     try:
@@ -22,7 +22,7 @@ def test_db():
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({"status": "error", "error": str(e)}), 500
 
-@health_bp.route("/health", methods=["GET"])
+@health_bp.route("/health", methods=["GET", "OPTIONS"])
 def health():
     """General health check"""
     return jsonify({"status": "healthy", "service": "kids_chat_api"})

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from models.conversation import ConversationModel
-from services.summary_service import SummaryService
+from services.ai_service import AIService
 from concurrent.futures import ThreadPoolExecutor
 import logging
 
@@ -10,14 +10,13 @@ conversation_bp = Blueprint('conversation', __name__)
 executor = ThreadPoolExecutor(max_workers=2)
 
 @conversation_bp.route("/api/end-conversation", methods=["POST"])
-def end_conversation():
-    """Handle forced conversation end with enhanced logging"""
+def end_conversation():    
+        
     try:
         # Handle both JSON and FormData
         if request.is_json:
             data = request.get_json() or {}
         else:
-            # Handle FormData from sendBeacon
             data = {
                 'user_id': request.form.get('user_id'),
                 'action': request.form.get('action', 'page_close')
@@ -29,22 +28,48 @@ def end_conversation():
         if not user_id:
             return jsonify({"error": "User ID required"}), 400
         
+        # Get all messages from chat session
+        from routes.chat_routes import get_session_messages
+        messages = get_session_messages(user_id)
+        
+        if not messages:
+            return jsonify({"error": "No active conversation"}), 400
+            
         conversation_model = ConversationModel()
-        success = conversation_model.mark_conversation_ended(user_id, end_reason)
+        ai_service = AIService()
         
-        if success:
-            logger.info(f"🔚 FORCED CONVERSATION END: User {user_id}")
-            logger.info(f"📝 End reason: {end_reason}")
-            
-            # Clear session messages
-            from routes.chat_routes import clear_session_messages
-            clear_session_messages(user_id)
-            
-            # Generate final summary asynchronously
-            summary_service = SummaryService()
-            executor.submit(summary_service.generate_final_session_summary, user_id)
+        # Generate comprehensive summary        
+        summary = ai_service.generate_summary(messages, conversation_model.get_last_summary)
+        topics = ai_service.extract_topics(messages)
         
-        return jsonify({"status": "conversation_ended"})
+        # Save complete conversation
+        conversation_model.save_conversation(
+            user_id,
+            messages,
+            summary,
+            topics,
+            is_start=False,
+            is_end=True
+        )
+        
+        logger.info(f"🔚 CONVERSATION SAVED: User {user_id}")
+        logger.info(f"📝 End reason: {end_reason}")
+        logger.info(f"📊 Messages in conversation: {len(messages)}")
+        
+        # Force clear any active conversation state
+        conversation_model.mark_conversation_ended(user_id, end_reason)
+        from routes.chat_routes import clear_session_messages
+        clear_session_messages(user_id)
+        
+        
+        # Clear session messages
+        from routes.chat_routes import clear_session_messages
+        clear_session_messages(user_id)
+        
+        return jsonify({
+            "status": "conversation_ended",
+            "message_count": len(messages)
+        })
         
     except Exception as e:
         logger.error(f"❌ Error ending conversation: {str(e)}")
@@ -80,9 +105,9 @@ def get_conversation_status(user_id):
         if not last_conversation:
             return jsonify({"active": False, "new_conversation": True})
         
-        from services.conversation_service import ConversationService
-        conversation_service = ConversationService()
-        is_active, is_new = conversation_service.is_conversation_active(user_id)
+        # Check if conversation is complete
+        is_active = not last_conversation.get("conversation_complete", False)
+        is_new = False  # Assume not new if we found a conversation
         
         return jsonify({
             "active": is_active,
@@ -125,4 +150,3 @@ def get_conversations(user_id):
     except Exception as e:
         logger.error(f"Error getting conversations: {str(e)}")
         return jsonify({"error": str(e)}), 500
-

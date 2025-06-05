@@ -1,5 +1,5 @@
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timezone
 from config import Config
 import logging
 
@@ -17,15 +17,15 @@ class ConversationModel:
         try:
             conversation = {
                 "user_id": user_id,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
                 "messages": messages,
                 "summary": summary,
                 "topics": topics,
                 "conversation_start": is_start,
                 "conversation_end": is_end,
-                "ended_at": datetime.utcnow() if is_end else None,
+                "ended_at": datetime.now(timezone.utc) if is_end else None,
                 "conversation_complete": is_end,
-                "last_activity": datetime.utcnow()
+                "last_activity": datetime.now(timezone.utc)
             }
             
             result = self.conversations_col.insert_one(conversation)
@@ -61,19 +61,36 @@ class ConversationModel:
             logger.error(f"Failed to get last conversation for {user_id}: {str(e)}")
             return None
     
+    def get_last_summary(self, user_id):
+        """Get the most recent summary/profile for a user"""
+        try:
+            self.get_user_context(user_id,1)
+        except Exception as e:
+            logger.error(f"Failed to get last summary for {user_id}: {str(e)}")
+            return None
+
     def mark_conversation_ended(self, user_id, end_reason="manual"):
         """Mark the last active conversation as ended"""
         try:
-            result = self.conversations_col.update_one(
+            # First find the most recent incomplete conversation
+            last_conversation = self.conversations_col.find_one(
                 {"user_id": user_id, "conversation_complete": {"$ne": True}},
+                sort=[("timestamp", -1)]
+            )
+            
+            if not last_conversation:
+                return False
+                
+            # Update by _id instead of using sort
+            result = self.conversations_col.update_one(
+                {"_id": last_conversation["_id"]},
                 {
                     "$set": {
-                        "ended_at": datetime.utcnow(),
+                        "ended_at": datetime.now(timezone.utc),
                         "end_reason": end_reason,
                         "conversation_complete": True
                     }
-                },
-                sort=[("timestamp", -1)]
+                }
             )
             return result.modified_count > 0
         except Exception as e:
@@ -86,7 +103,7 @@ class ConversationModel:
             # Remove the sort parameter - updateOne doesn't support it
             result = self.conversations_col.update_one(
                 {"user_id": user_id, "conversation_complete": {"$ne": True}},
-                {"$set": {"last_activity": datetime.utcnow()}}
+                {"$set": {"last_activity": datetime.now(timezone.utc)}}
             )
             
             # If no active conversation found, that's okay
@@ -158,4 +175,3 @@ class ConversationModel:
             }
         except Exception as e:
             return {"status": "error", "error": str(e)}
-
