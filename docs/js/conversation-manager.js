@@ -65,37 +65,90 @@ class ConversationManager {
             return false;
         }
         
-        this.conversationActive = true;
-        this.conversationId = Date.now().toString();
-        
-        this.updateStatusIndicator(`🟢 New conversation started for ${this.currentUser.name}!`, 'status-active');
-        
-        return true;
-    }
-    
-    async endConversation() {
-        if (!this.conversationActive || !this.userId) return false;
-        
         try {
-            const response = await fetch(Config.endpoints.endConversation, {
+            // Verify with backend if conversation can start
+            const status = await this.checkStatus();
+            if (status && status.active) {
+                this.conversationActive = true;
+                this.updateStatusIndicator(`🟢 Continuing conversation for ${this.currentUser.name}`, 'status-active');
+                return true;
+            }
+            
+            // Start new conversation
+            this.conversationActive = true;
+            this.conversationId = Date.now().toString();
+            
+            // Send initial message to establish conversation
+            const response = await fetch(Config.endpoints.chat, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_id: this.userId,
-                    action: 'manual_end'
+                    message: "Hello",
+                    force_start: true
                 })
             });
             
-            if (response.ok) {
+            if (!response.ok) throw new Error('Failed to start conversation');
+            
+            this.updateStatusIndicator(`🟢 New conversation started for ${this.currentUser.name}!`, 'status-active');
+            return true;
+            
+        } catch (error) {
+            console.error('Start conversation failed:', error);
+            this.updateStatusIndicator('❌ Failed to start conversation', 'status-error');
+            return false;
+        }
+    }
+    
+    async endConversation() {
+        if (!this.conversationActive || !this.userId) {
+            this.updateStatusIndicator('❌ No active conversation to end', 'status-inactive');
+            return false;
+        }
+        
+        try {
+            const url = Config.endpoints.endConversation;
+            console.log(`Ending conversation at: ${url}`);
+            
+            console.log('Sending end conversation request with:', {
+                user_id: this.userId,
+                action: 'manual_end'
+            });
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: this.userId,
+                    action: 'manual_end'
+                }),
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('End conversation response:', data);
+            
+            if (data && data.status === 'conversation_ended') {
                 this.conversationActive = false;
                 this.conversationId = null;
-                this.updateStatusIndicator('🔴 Conversation ended', 'status-inactive');
+                this.updateStatusIndicator('🔴 Conversation ended successfully', 'status-inactive');
                 return true;
+            } else {
+                throw new Error('Unexpected response format');
             }
         } catch (error) {
             console.error('Failed to end conversation:', error);
+            this.updateStatusIndicator('❌ Failed to end conversation', 'status-error');
+            return false;
         }
-        return false;
     }
     
     async checkStatus() {
@@ -105,10 +158,18 @@ class ConversationManager {
         }
         
         try {
-            const response = await fetch(`${Config.endpoints.conversationStatus}/${this.userId}`);
-            const data = await response.json();
+            const url = `${Config.endpoints.conversationStatus}/${this.userId}`;
+            console.log(`Checking conversation status at: ${url}`);
             
-            if (data.active) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Status response:', data);
+            
+            if (data && data.hasOwnProperty('active')) {
                 this.conversationActive = true;
                 this.updateStatusIndicator(`🟢 ${this.currentUser.name} has an active conversation`, 'status-active');
             } else {
