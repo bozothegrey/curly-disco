@@ -10,7 +10,7 @@ class AIService:
         self.api_key = Config.DEEPSEEK_API_KEY
         self.headers = {"Authorization": f"Bearer {self.api_key}"}
     
-    def get_chat_response(self, messages, timeout=30, include_functions=False):
+    def get_chat_response(self, messages, timeout=30):
         """Get response from AI API"""
         try:
             payload = {
@@ -18,8 +18,7 @@ class AIService:
                 "messages": messages
             }
             
-            if include_functions:
-                payload["functions"] = [self._get_end_conversation_function()]
+            
             
             response = requests.post(
                 self.api_url,
@@ -71,22 +70,6 @@ class AIService:
             
         except Exception as e:
             logger.error(f"Topics generation failed: {str(e)}")
-            return "Topics generation failed"
-        
+            return "Topics generation failed"        
             
-    def _get_end_conversation_function(self):
-        """Function definition for AI to call when conversation ends"""
-        return {
-            "name": "end_conversation",
-            "description": "Call when the conversation is naturally finished or the child wants to end the chat",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "reason": {
-                        "type": "string",
-                        "description": "Reason for ending (e.g., 'user_goodbye', 'natural_conclusion', 'task_completed')"
-                    }
-                },
-                "required": ["reason"]
-            }
-        }
+    

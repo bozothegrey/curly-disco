@@ -33,7 +33,20 @@ def end_conversation():
         messages = get_session_messages(user_id)
         
         if not messages:
-            return jsonify({"error": "No active conversation"}), 400
+            # Try to get messages from last incomplete conversation
+            last_conv = conversation_model.get_last_conversation(user_id)
+            if last_conv and not last_conv.get("conversation_complete"):
+                messages = last_conv.get("messages", [])
+            
+            if not messages:
+                logger.error(f"No messages found for user {user_id}")
+                return jsonify({
+                    "error": "No messages found",
+                    "debug": {
+                        "session_messages": bool(get_session_messages(user_id)),
+                        "last_conversation": bool(last_conv)
+                    }
+                }), 400
             
         conversation_model = ConversationModel()
         ai_service = AIService()
@@ -55,20 +68,17 @@ def end_conversation():
         logger.info(f"🔚 CONVERSATION SAVED: User {user_id}")
         logger.info(f"📝 End reason: {end_reason}")
         logger.info(f"📊 Messages in conversation: {len(messages)}")
+
+        n_msg = len(messages)       
         
         # Force clear any active conversation state
         conversation_model.mark_conversation_ended(user_id, end_reason)
         from routes.chat_routes import clear_session_messages
         clear_session_messages(user_id)
-        
-        
-        # Clear session messages
-        from routes.chat_routes import clear_session_messages
-        clear_session_messages(user_id)
-        
+
         return jsonify({
             "status": "conversation_ended",
-            "message_count": len(messages)
+            "message_count": n_msg
         })
         
     except Exception as e:
